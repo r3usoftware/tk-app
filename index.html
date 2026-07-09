@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1f6fb2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>R3U Timekeeping</title>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+  :root{
+    --ink:#1a1d29; --ink-soft:#5a6072; --line:#e4e6ee; --line-soft:#f0f1f6;
+    --bg:#f6f7fb; --card:#fff; --brand:#1f6fb2; --brand-dim:#e8f1f9;
+    --ok:#0e8c56; --ok-dim:#e3f4ec; --r:14px; --rs:10px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;}
+  .app{max-width:520px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column;}
+  header{position:sticky;top:0;z-index:20;background:var(--card);
+    border-bottom:1px solid var(--line);padding:14px 16px;display:flex;align-items:center;gap:10px;}
+  header .logo{width:34px;height:34px;border-radius:9px;background:var(--brand-dim);
+    color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:18px;}
+  header h1{font-size:16px;margin:0;font-weight:650;}
+  header .step{margin-left:auto;font-size:12px;color:var(--brand);
+    background:var(--brand-dim);padding:4px 11px;border-radius:20px;font-weight:600;}
+  .scroll{flex:1;padding:16px;}
+  .screen{display:none;animation:fade .25s ease;}
+  .screen.on{display:block;}
+  @keyframes fade{from{opacity:0;transform:translateY(6px);}to{opacity:1;}}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+    padding:16px;margin-bottom:14px;box-shadow:0 1px 3px rgba(20,25,45,.05);}
+  .card h2{font-size:14px;margin:0 0 3px;font-weight:650;}
+  .card .sub{font-size:12.5px;color:var(--ink-soft);margin:0;}
+  label.fl{display:block;font-size:12px;color:var(--ink-soft);margin:12px 0 5px;font-weight:550;}
+  input,textarea{width:100%;border:1px solid var(--line);border-radius:var(--rs);
+    padding:11px 12px;font-size:14px;background:var(--card);font-family:inherit;color:var(--ink);}
+  input:focus,textarea:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-dim);}
+  textarea{resize:vertical;min-height:96px;line-height:1.5;}
+  .seg{display:flex;gap:8px;}
+  .seg button{flex:1;padding:11px;border-radius:var(--rs);border:1px solid var(--line);
+    background:var(--card);font-size:13px;font-weight:600;cursor:pointer;color:var(--ink);}
+  .seg button.sel{border-color:var(--brand);background:var(--brand-dim);color:var(--brand);}
+  .btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+    padding:14px;border-radius:var(--rs);border:none;font-size:15px;font-weight:650;cursor:pointer;}
+  .btn:active{transform:scale(.985);}
+  .btn:disabled{opacity:.55;cursor:not-allowed;}
+  .btn-primary{background:var(--brand);color:#fff;}
+  .btn-ok{background:var(--ok);color:#fff;}
+  .btn-ghost{background:var(--card);border:1px solid var(--line);color:var(--ink);}
+  .toggle{display:flex;align-items:center;justify-content:space-between;
+    padding:13px 14px;border:1px solid var(--line);border-radius:var(--rs);margin-top:12px;}
+  .toggle span{font-size:13.5px;font-weight:550;}
+  .sw{width:46px;height:27px;border-radius:14px;background:var(--line);position:relative;cursor:pointer;transition:background .18s;}
+  .sw.on{background:var(--brand);}
+  .sw::after{content:"";position:absolute;width:21px;height:21px;border-radius:50%;
+    background:#fff;top:3px;left:3px;transition:left .18s;box-shadow:0 1px 2px rgba(0,0,0,.2);}
+  .sw.on::after{left:22px;}
+  table.tk{width:100%;border-collapse:collapse;font-size:12.5px;}
+  table.tk th{text-align:left;color:var(--brand);font-weight:650;padding:7px 5px;
+    border-bottom:1.5px solid var(--line);font-size:11.5px;}
+  table.tk td{padding:4px;border-bottom:1px solid var(--line-soft);}
+  table.tk tr.wknd td{background:var(--line-soft);}
+  table.tk td input{padding:7px 6px;font-size:12px;border-radius:7px;}
+  table.tk .dt{white-space:nowrap;color:var(--ink-soft);font-size:11.5px;}
+  .ph{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px;
+    height:160px;border:1.5px dashed var(--line);border-radius:var(--rs);color:var(--ink-soft);
+    font-size:13px;cursor:pointer;background:var(--line-soft);margin-top:12px;}
+  #shotImg{width:100%;border-radius:var(--rs);border:1px solid var(--line);max-height:280px;
+    object-fit:contain;background:var(--line-soft);margin-top:12px;cursor:pointer;}
+  .note{font-size:11.5px;color:var(--ink-soft);line-height:1.5;margin-top:10px;}
+  .bar{height:5px;background:var(--line);border-radius:3px;overflow:hidden;margin-top:10px;display:none;}
+  .bar.on{display:block;}
+  .bar>i{display:block;height:100%;width:0;background:var(--brand);transition:width .3s;}
+  .done-ico{width:58px;height:58px;border-radius:50%;background:var(--ok-dim);color:var(--ok);
+    display:flex;align-items:center;justify-content:center;margin:6px auto 12px;font-size:30px;}
+  .file-chip{display:flex;align-items:center;gap:9px;padding:11px 13px;background:var(--line-soft);
+    border-radius:var(--rs);font-size:12.5px;margin-top:12px;}
+  .file-chip .badge{margin-left:auto;font-size:11px;color:var(--ok);font-weight:600;}
+  .back{font-size:22px;color:var(--ink-soft);cursor:pointer;line-height:1;visibility:hidden;}
+  .hidden{display:none!important;}
+  .toast{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);
+    background:var(--ink);color:#fff;padding:12px 20px;border-radius:24px;font-size:13.5px;
+    opacity:0;transition:all .3s;z-index:100;max-width:90%;text-align:center;}
+  .toast.on{opacity:1;transform:translateX(-50%);}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <span class="back" id="back">‹</span>
+    <span class="logo">◷</span>
+    <h1 id="title">Timekeeping</h1>
+    <span class="step" id="stepBadge">1 / 4</span>
+  </header>
+
+  <div class="scroll">
+
+    <!-- STEP 1 -->
+    <section class="screen on" id="s1">
+      <div class="card">
+        <h2 id="empName">—</h2>
+        <p class="sub" id="empDept">—</p>
+      </div>
+      <div class="card">
+        <h2>Cut-off period</h2>
+        <div class="seg" style="margin-top:12px;">
+          <button id="cutA" class="sel">25 – 9</button>
+          <button id="cutB">10 – 24</button>
+        </div>
+        <label class="fl">Saklaw</label>
+        <div class="seg">
+          <input type="date" id="dStart" style="font-size:13px;">
+          <input type="date" id="dEnd" style="font-size:13px;">
+        </div>
+        <div class="toggle">
+          <span>Round sa 8:00 / 5:00</span>
+          <div class="sw on" id="rndSw" role="switch" aria-checked="true"></div>
+        </div>
+        <p class="note">Naka-on: lahat ng oras 8:00 AM / 5:00 PM. Naka-off: exact times mula OCR o manual edit.</p>
+      </div>
+      <button class="btn btn-primary" id="toS2">Attach screenshot →</button>
+      <button class="btn btn-ghost" id="toSettings" style="margin-top:10px;">Settings</button>
+    </section>
+
+    <!-- STEP 2 -->
+    <section class="screen" id="s2">
+      <div class="card">
+        <h2>Krono screenshot</h2>
+        <p class="sub">Piliin mula gallery, tapos basahin ang oras.</p>
+        <div id="phPick" class="ph">
+          <span style="font-size:26px;">🖼️</span>
+          <span>Tap para magbukas ng gallery</span>
+        </div>
+        <img id="shotImg" class="hidden" alt="screenshot preview">
+        <input type="file" id="fileIn" accept="image/*" class="hidden">
+        <div class="bar" id="ocrBar"><i id="ocrFill"></i></div>
+        <p class="note" id="ocrNote"></p>
+      </div>
+      <button class="btn btn-primary" id="readBtn" disabled>Read times (OCR)</button>
+      <button class="btn btn-ghost" id="toS3" style="margin-top:10px;" disabled>Review table →</button>
+    </section>
+
+    <!-- STEP 3 -->
+    <section class="screen" id="s3">
+      <div class="card">
+        <h2>Review / edit</h2>
+        <p class="sub">Lahat editable bago i-generate.</p>
+        <div style="overflow-x:auto;margin-top:10px;">
+          <table class="tk" id="tkTable"></table>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="genBtn">Generate TK Excel →</button>
+      <p class="note" id="genNote" style="text-align:center;"></p>
+    </section>
+
+    <!-- STEP 4 -->
+    <section class="screen" id="s4">
+      <div class="card" style="text-align:center;">
+        <div class="done-ico">✓</div>
+        <h2 style="text-align:center;">TK Excel ready</h2>
+        <p class="sub" id="genFileName"></p>
+        <p class="note">Ginawa sa Google Apps Script — may tunay na screenshot na naka-embed katabi ng TK data (column G).</p>
+        <button class="btn btn-ghost" id="dlBtn" style="margin-top:12px;">Download Excel</button>
+      </div>
+      <div class="card">
+        <h2>Send to HR</h2>
+        <label class="fl">To</label><input id="mTo">
+        <label class="fl">Subject</label><input id="mSubj">
+        <label class="fl">Message</label><textarea id="mBody"></textarea>
+        <div class="file-chip"><span>📎</span><span id="attName"></span><span class="badge">🖼️ image embedded</span></div>
+      </div>
+      <button class="btn btn-ok" id="sendBtn">Send via Gmail</button>
+      <p class="note" style="text-align:center;">Magse-send mula mismo sa Gmail account mo (via Apps Script).</p>
+    </section>
+
+    <!-- SETTINGS -->
+    <section class="screen" id="settings">
+      <div class="card">
+        <h2>Settings</h2>
+        <p class="sub">Naka-save sa device na ito.</p>
+        <label class="fl">GAS Web App URL *</label><input id="cGas" placeholder="https://script.google.com/macros/s/.../exec">
+        <label class="fl">Employee name</label><input id="cName">
+        <label class="fl">Department</label><input id="cDept">
+        <label class="fl">Location</label><input id="cLoc">
+        <label class="fl">Checked by</label><input id="cChk">
+        <label class="fl">HR email</label><input id="cHr">
+        <label class="fl">Default subject</label><input id="cSubj">
+        <label class="fl">Default message</label><textarea id="cBody"></textarea>
+      </div>
+      <button class="btn btn-primary" id="saveSet">Save</button>
+      <button class="btn btn-ghost" id="backFromSet" style="margin-top:10px;">Back</button>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $=id=>document.getElementById(id);
+const DEF={
+  gas_url:"", employee_name:"Andreu S. Sulayao", department:"Technical Support",
+  location:"Cummins", checked_by:"MR. WALTER TOLEDO",
+  default_in:"8:00 AM", default_out:"5:00 PM", hr_email:"",
+  default_subject:"Timekeeping Report - {name} - {period}",
+  default_body:"Hi HR,\n\nPlease find attached my timekeeping report for the cut-off period {period}.\n\nThank you,\n{name}"
+};
+let cfg=load();
+const st={cutKind:"25",round:true,rows:[],shotB64:null,shotType:"jpeg",imgW:0,imgH:0,
+  xlsxB64:null,fileName:"",period:"",periodShort:""};
+
+function load(){try{return Object.assign({},DEF,JSON.parse(localStorage.getItem("tkcfg2")||"{}"));}catch(e){return Object.assign({},DEF);}}
+function save(){localStorage.setItem("tkcfg2",JSON.stringify(cfg));}
+function toast(m){const t=$("toast");t.textContent=m;t.classList.add("on");setTimeout(()=>t.classList.remove("on"),3000);}
+
+// nav
+const stepOf={s1:1,s2:2,s3:3,s4:4};
+let cur="s1";
+function go(id){
+  ["s1","s2","s3","s4","settings"].forEach(s=>$(s).classList.toggle("on",s===id));
+  cur=id;
+  const n=stepOf[id];
+  $("stepBadge").style.display=n?"":"none";
+  if(n)$("stepBadge").textContent=n+" / 4";
+  $("back").style.visibility=id==="s1"?"hidden":"visible";
+  $("title").textContent=id==="settings"?"Settings":"Timekeeping";
+  document.querySelector(".scroll").scrollTop=0;
+}
+$("back").onclick=()=>{
+  if(cur==="settings")return go("s1");
+  const o=["s1","s2","s3","s4"],i=o.indexOf(cur);
+  if(i>0)go(o[i-1]);
+};
+
+// dates
+const pad=n=>String(n).padStart(2,"0");
+const iso=d=>d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate());
+const DOW=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const fmtDate=d=>pad(d.getDate())+"-"+MON[d.getMonth()]+"-"+d.getFullYear();
+function cutoff(k){
+  const t=new Date(),y=t.getFullYear(),m=t.getMonth();
+  if(k==="25")return t.getDate()>=25?[new Date(y,m,25),new Date(y,m+1,9)]:[new Date(y,m-1,25),new Date(y,m,9)];
+  return [new Date(y,m,10),new Date(y,m,24)];
+}
+function buildRows(s,e){
+  const rows=[];const d=new Date(s);
+  while(d<=e){
+    const w=d.getDay()===0||d.getDay()===6;
+    rows.push({date:new Date(d),dow:DOW[d.getDay()],
+      tin:w?"":cfg.default_in,tout:w?"":cfg.default_out,loc:w?"":cfg.location,wknd:w});
+    d.setDate(d.getDate()+1);
+  }
+  return rows;
+}
+function setPeriod(){
+  const [s,e]=cutoff(st.cutKind);
+  $("dStart").value=iso(s);$("dEnd").value=iso(e);
+  st.rows=buildRows(s,e);
+}
+
+// OCR parse: "clocked IN at June 9th 2026 ... 8:00 am"
+const MONTHS={january:0,february:1,march:2,april:3,may:4,june:5,july:6,august:7,september:8,october:9,november:10,december:11};
+function parseOcr(text){
+  const map={};
+  const re=/clocked\s+(IN|OUT)\s+at\s+([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?\s+(\d{4})[^0-9]*?(\d{1,2}:\d{2})\s*([ap]m)/gi;
+  let m;
+  while((m=re.exec(text))!==null){
+    const mon=MONTHS[m[2].toLowerCase()];if(mon===undefined)continue;
+    const key=m[4]+"-"+pad(mon+1)+"-"+pad(+m[3]);
+    const time=m[5]+" "+m[6].toUpperCase();
+    if(!map[key])map[key]={};
+    if(m[1].toUpperCase()==="IN")map[key].in=time;else map[key].out=time;
+  }
+  return map;
+}
+function mergeOcr(map){
+  let n=0;
+  st.rows.forEach(r=>{
+    const k=iso(r.date);
+    if(map[k]){
+      if(map[k].in){r.tin=map[k].in;n++;}
+      if(map[k].out)r.tout=map[k].out;
+      if(map[k].in||map[k].out)r.loc=cfg.location;
+    }
+  });
+  return n;
+}
+
+// table
+function renderTable(){
+  const tb=$("tkTable");
+  tb.innerHTML="<tr><th>Date</th><th>Day</th><th>In</th><th>Out</th></tr>";
+  st.rows.forEach((r,i)=>{
+    const tr=document.createElement("tr");
+    if(r.wknd)tr.className="wknd";
+    tr.innerHTML=`<td class="dt">${pad(r.date.getDate())}-${MON[r.date.getMonth()]}</td>
+      <td class="dt">${r.dow.slice(0,3)}</td>
+      <td><input value="${r.tin}" data-i="${i}" data-f="tin"></td>
+      <td><input value="${r.tout}" data-i="${i}" data-f="tout"></td>`;
+    tb.appendChild(tr);
+  });
+  tb.querySelectorAll("input").forEach(inp=>{
+    inp.addEventListener("input",e=>{st.rows[+e.target.dataset.i][e.target.dataset.f]=e.target.value;});
+  });
+}
+function applyRound(){
+  if(!st.round)return;
+  st.rows.forEach(r=>{if(r.tin)r.tin=cfg.default_in;if(r.tout)r.tout=cfg.default_out;});
+}
+
+// GAS call — text/plain para walang CORS preflight
+async function gas(payload){
+  if(!cfg.gas_url)throw new Error("Ilagay muna ang GAS Web App URL sa Settings.");
+  const res=await fetch(cfg.gas_url,{method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify(payload)});
+  const data=await res.json();
+  if(!data.ok)throw new Error(data.error||"GAS error");
+  return data;
+}
+function buildPayload(mode){
+  const s=st.rows[0].date,e=st.rows[st.rows.length-1].date;
+  st.period=`${MON[s.getMonth()]} ${pad(s.getDate())} - ${MON[e.getMonth()]} ${pad(e.getDate())}, ${e.getFullYear()}`;
+  st.periodShort=`${MON[s.getMonth()]}${pad(s.getDate())}-${MON[e.getMonth()]}${pad(e.getDate())}_${e.getFullYear()}`;
+  return {
+    mode, name:cfg.employee_name, dept:cfg.department, period:st.period,
+    periodShort:st.periodShort, checkedBy:cfg.checked_by,
+    rows:st.rows.map(r=>({date:fmtDate(r.date),day:r.dow,tin:r.tin,tout:r.tout,loc:r.loc})),
+    imageB64:st.shotB64, imageType:st.shotType, imgW:st.imgW, imgH:st.imgH
+  };
+}
+
+// wire
+$("cutA").onclick=()=>{st.cutKind="25";$("cutA").classList.add("sel");$("cutB").classList.remove("sel");setPeriod();};
+$("cutB").onclick=()=>{st.cutKind="10";$("cutB").classList.add("sel");$("cutA").classList.remove("sel");setPeriod();};
+$("rndSw").onclick=()=>{st.round=!st.round;$("rndSw").classList.toggle("on",st.round);$("rndSw").setAttribute("aria-checked",st.round);};
+$("dStart").onchange=$("dEnd").onchange=()=>{
+  const s=new Date($("dStart").value),e=new Date($("dEnd").value);
+  if(s&&e&&e>=s)st.rows=buildRows(s,e);
+};
+$("toS2").onclick=()=>{if(!st.rows.length)setPeriod();go("s2");};
+$("toSettings").onclick=()=>{fillSet();go("settings");};
+
+$("phPick").onclick=()=>$("fileIn").click();
+$("shotImg").onclick=()=>$("fileIn").click();
+$("fileIn").onchange=e=>{
+  const f=e.target.files[0];if(!f)return;
+  const img=new Image();
+  const rd=new FileReader();
+  rd.onload=ev=>{
+    img.onload=()=>{
+      // compress via canvas para magaan ang payload
+      const maxW=1200;
+      const sc=Math.min(1,maxW/img.width);
+      const cv=document.createElement("canvas");
+      cv.width=Math.round(img.width*sc);cv.height=Math.round(img.height*sc);
+      cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+      const dataUrl=cv.toDataURL("image/jpeg",0.85);
+      st.shotB64=dataUrl.split(",")[1];
+      st.shotType="jpeg";st.imgW=cv.width;st.imgH=cv.height;
+      $("shotImg").src=dataUrl;
+      $("shotImg").classList.remove("hidden");
+      $("phPick").classList.add("hidden");
+      $("readBtn").disabled=false;$("toS3").disabled=false;
+    };
+    img.src=ev.target.result;
+  };
+  rd.readAsDataURL(f);
+};
+
+$("readBtn").onclick=async()=>{
+  $("readBtn").disabled=true;$("readBtn").textContent="Reading...";
+  $("ocrBar").classList.add("on");$("ocrNote").textContent="Sinusuri ang larawan...";
+  try{
+    const {data}=await Tesseract.recognize($("shotImg").src,"eng",{
+      logger:m=>{if(m.status==="recognizing text")$("ocrFill").style.width=Math.round(m.progress*100)+"%";}
+    });
+    const n=mergeOcr(parseOcr(data.text));
+    $("ocrNote").textContent=n?`Nabasa: ${n} araw. I-check sa next screen.`:"Walang nahuling oras — manual edit sa table.";
+    $("readBtn").textContent=n?`Read OK (${n})`:"Read again";
+  }catch(err){
+    $("ocrNote").textContent="OCR error: "+err.message;
+    $("readBtn").textContent="Read times (OCR)";
+  }
+  $("readBtn").disabled=false;
+};
+$("toS3").onclick=()=>{applyRound();renderTable();go("s3");};
+
+$("genBtn").onclick=async()=>{
+  applyRound();
+  $("genBtn").disabled=true;$("genBtn").textContent="Generating...";
+  $("genNote").textContent="Ginagawa sa Google Apps Script...";
+  try{
+    const data=await gas(buildPayload("generate"));
+    st.xlsxB64=data.xlsxB64;st.fileName=data.filename;
+    $("genFileName").textContent=st.fileName;
+    $("attName").textContent=st.fileName;
+    $("mTo").value=cfg.hr_email;
+    $("mSubj").value=cfg.default_subject.replace("{name}",cfg.employee_name).replace("{period}",st.period);
+    $("mBody").value=cfg.default_body.replace(/{name}/g,cfg.employee_name).replace(/{period}/g,st.period);
+    go("s4");
+  }catch(err){toast("Generate failed: "+err.message);}
+  $("genBtn").disabled=false;$("genBtn").textContent="Generate TK Excel →";
+  $("genNote").textContent="";
+};
+
+$("dlBtn").onclick=()=>{
+  if(!st.xlsxB64)return;
+  const bin=atob(st.xlsxB64);
+  const arr=new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);
+  const blob=new Blob([arr],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=st.fileName;
+  document.body.appendChild(a);a.click();a.remove();
+};
+
+$("sendBtn").onclick=async()=>{
+  $("sendBtn").disabled=true;$("sendBtn").textContent="Sending...";
+  try{
+    const p=buildPayload("send");
+    p.to=$("mTo").value.trim();p.subject=$("mSubj").value.trim();p.body=$("mBody").value;
+    await gas(p);
+    $("sendBtn").textContent="Sent ✓";toast("Na-send sa HR ✓");
+  }catch(err){
+    toast("Send failed: "+err.message);
+    $("sendBtn").disabled=false;$("sendBtn").textContent="Send via Gmail";
+  }
+};
+
+// settings
+function fillSet(){
+  $("cGas").value=cfg.gas_url;$("cName").value=cfg.employee_name;$("cDept").value=cfg.department;
+  $("cLoc").value=cfg.location;$("cChk").value=cfg.checked_by;$("cHr").value=cfg.hr_email;
+  $("cSubj").value=cfg.default_subject;$("cBody").value=cfg.default_body;
+}
+$("saveSet").onclick=()=>{
+  cfg.gas_url=$("cGas").value.trim();cfg.employee_name=$("cName").value.trim();
+  cfg.department=$("cDept").value.trim();cfg.location=$("cLoc").value.trim();
+  cfg.checked_by=$("cChk").value.trim();cfg.hr_email=$("cHr").value.trim();
+  cfg.default_subject=$("cSubj").value;cfg.default_body=$("cBody").value;
+  save();
+  $("empName").textContent=cfg.employee_name;$("empDept").textContent=cfg.department;
+  toast("Saved ✓");go("s1");
+};
+$("backFromSet").onclick=()=>go("s1");
+
+// init
+$("empName").textContent=cfg.employee_name;
+$("empDept").textContent=cfg.department;
+setPeriod();
+</script>
+</body>
+</html>
